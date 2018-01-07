@@ -91,6 +91,31 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          
+          // Convert the waypoints to Car's Co-ordinate system for easier calculation of errors
+          for(unsigned int i = 0; i < ptsx.size(); i++)
+          {
+             // Shift origin to Car's origin
+             double new_x = ptsx[i] - px;
+             double new_y = ptsy[i] - py;
+             
+             // Rotate by psi degrees
+             ptsx[i] = (new_x*cos(0 - psi)) - (new_y*sin(0 - psi));
+             ptsy[i] = (new_x*sin(0 - psi)) + (new_y*cos(0 - psi));
+          }
+          
+          // Prepare vector for polyfit
+          double* ptr_ptsx = &ptsx[0];
+          double* ptr_ptsy = &ptsy[0];
+          Eigen::Map<Eigen::VectorXd> ptsx_transformed(ptr_ptsx, 6);
+          Eigen::Map<Eigen::VectorXd> ptsy_transformed(ptr_ptsy, 6);
+          
+          // Fit a polynomial using transformed points
+          auto coeffs = polyfit(ptsx_transformed, ptsy_transformed, 3);
+          
+          // Calculate cte and epsi
+          double cte = polyeval(coeffs, 0);
+          double epsi = psi - atan(coeffs[1] + (coeffs[2]*2*px) + (coeffs[3]*3*pow(px,2))); // psi - arctan(f'(x))
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,14 +123,19 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          double steer_value = j[1]["steering_angle"];
+          double throttle_value = j[1]["throttle"];
+          
+          Eigen::VectorXd state(6);
+          // In the car co-ordinate syste, the cars x,y points and heading are zero
+          state << 0, 0, 0, v, cte, epsi;
+          
+          // Pass in the state and the path(coefficients) to follow to MPC
+          auto vars = mpc.Solve(state, coeffs); 
 
-          json msgJson;
-          // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
-          // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = throttle_value;
+          double Lf = 2.67;
+          steer_value = -vars[0]/(deg2rad(25)*Lf);
+          throttle_value = vars[1];
 
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
@@ -113,16 +143,42 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
-
-          msgJson["mpc_x"] = mpc_x_vals;
-          msgJson["mpc_y"] = mpc_y_vals;
-
+          for (unsigned int i = 0; i < vars.size(); i++)
+          {
+             if((i%2) == 0)
+             {
+                mpc_x_vals.push_back(vars[i]);
+             }
+             else
+             {
+                mpc_y_vals.push_back(vars[i]);                
+             }
+          }          
+          
           //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+          double incr_dist = 2.5;
+          int num_points = 25;
+          for(int i = 0; i < num_points; i++)
+          {
+             double temp_x = incr_dist*i;
+             next_x_vals.push_back(temp_x);
+             next_y_vals.push_back(polyeval(coeffs, temp_x));
+          }
+          
+
+          json msgJson;
+          // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
+          // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
+          msgJson["steering_angle"] = steer_value;
+          msgJson["throttle"] = throttle_value;
+
+          msgJson["mpc_x"] = mpc_x_vals;
+          msgJson["mpc_y"] = mpc_y_vals;
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;

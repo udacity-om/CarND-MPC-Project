@@ -2,6 +2,23 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+# Rubric Points
+
+## Model
+The model is a kinematic model with state including vehicle's positiom, x and y, vehicle's heading or orientation, psi and velocity, v. The state also includes errors such as cross track error, cte, and orientation error, epsi. The model's control output are steering angle and acceleration. The model also takes into account the distance between the front of the vehicle and its center of gravity and is symbolized as Lf. The model calculates the next state as per the equations mentioned below: 
+
+![alt text] "model_equations.jpg"
+
+## Timestep Length and Elapsed Duration (N & dt)
+N and dt combined tells the model to see Nxdt seconds into the future. The values for N and dt were choosen as recommended by the Udacity MPC project walkthrough video. N is 10 and dt is 0.01. However, experimenting with N and dt showed that increasing N(to 20) meant the model had to work on N copies of all the state parameters which made the model slow. The car also went off track after sometime. Decreasing N(to 5) meant the model was not able to make good prediction and went off track easily in the beginning itself. Increasing dt(to 0.2) meant the car had difficulties making smooth turns at the turnings and decreasing dt(to 0.05) meant bad predictions especially at the turnings and the car went off track. 
+
+## Polynomial Fitting and MPC Preprocessing
+For easier calculation, the waypoints were transformed to vehicle's co-ordinate system. The car's position was always considered as origin and car's heading as 0. So all the calculations which includes car's position and orientation will be easy as these parameters are zero. Some of the calculations are defining current state and calculating cte and epsi. 
+
+## Model Predictive Control with Latency
+To account for latency, I predicted where the car would be after the latency time. I used the same equations as mentioned in "Model" section to do my prediction. The equations simplies here too as the model works on vehicle's co-ordinate system. The predicted state is fed to the MPC and the controls would be applied to the proper state of the car.
+
+---
 
 ## Dependencies
 

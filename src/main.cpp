@@ -115,7 +115,8 @@ int main() {
           
           // Calculate cte and epsi
           double cte = polyeval(coeffs, 0);
-          double epsi = psi - atan(coeffs[1] + (coeffs[2]*2*px) + (coeffs[3]*3*pow(px,2))); // psi - arctan(f'(x))
+          //double epsi = psi - atan(coeffs[1] + (coeffs[2]*2*px) + (coeffs[3]*3*pow(px,2))); // psi - arctan(f'(x))
+          double epsi = -atan(coeffs[1]);
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -127,13 +128,21 @@ int main() {
           double throttle_value = j[1]["throttle"];
           
           Eigen::VectorXd state(6);
+          double latency_in_sec = 0.1;
+          double latency_in_msec = latency_in_sec*1000;
+          double Lf = 2.67;
           // In the car co-ordinate syste, the cars x,y points and heading are zero
-          state << 0, 0, 0, v, cte, epsi;
+          double new_px = v*latency_in_sec; // px + v*cos(psi)*dt
+          double new_py = 0; // py + v*sin(psi)*dt
+          double new_psi = (v/Lf)*(-steer_value)*latency_in_sec; //psi + (v/Lf)*delta*dt
+          double new_v = v + (throttle_value*latency_in_sec);
+          double new_cte = cte + (v*sin(epsi)*latency_in_sec);
+          double new_epsi = epsi - ((-steer_value)*(v/Lf)*latency_in_sec);
+          state << new_px, new_py, new_psi, new_v, new_cte, new_epsi;
           
           // Pass in the state and the path(coefficients) to follow to MPC
           auto vars = mpc.Solve(state, coeffs); 
 
-          double Lf = 2.67;
           steer_value = -vars[0]/(deg2rad(25)*Lf);
           throttle_value = vars[1];
 
